@@ -197,18 +197,17 @@ def global_efficiency(A, weighted=True):
 
     Returns
     -------
-    Eglob : float
+    global_e : float
     """
 
     A = np.asarray(A, dtype=float)
 
     if weighted:
 
-        Dmat = np.zeros_like(A)
-        mask = A > 0
-        Dmat[mask] = 1.0 / A[mask]
+        with np.errstate(divide='ignore'):
+            dist = np.where(A > 0, 1.0/A, 0)
 
-        D = shortest_path(Dmat, directed=False, unweighted=False)
+        D = shortest_path(dist, directed=False, unweighted=False)
 
     else:
 
@@ -236,41 +235,21 @@ def local_efficiency(A, weighted=True):
 
     Returns
     -------
-    Eloc : (N,) ndarray
+    local_e : (N,) ndarray
     """
 
     A = np.asarray(A, dtype=float)
     N = len(A)
-    Eloc = np.zeros(N)
+    local_e = np.zeros(N)
 
     for i in range(N):
 
         neighbors = np.where(A[i] > 0)[0]
 
-        m = len(neighbors)
-
-        if m < 2:
+        if len(neighbors) < 2:
             continue
 
         subA = A[np.ix_(neighbors, neighbors)]
+        local_e[i] = global_efficiency(subA, weighted=weighted)
 
-        if weighted:
-
-            Dmat = np.zeros_like(subA)
-            mask = subA > 0
-            Dmat[mask] = 1.0 / subA[mask]
-
-            D = shortest_path(Dmat, directed=False, unweighted=False)
-
-        else:
-
-            D = shortest_path((subA > 0).astype(float), directed=False,
-                              unweighted=True)
-
-        with np.errstate(divide='ignore'):
-            invD = 1.0 / D
-
-        np.fill_diagonal(invD, 0)
-        Eloc[i] = invD.sum() / (m * (m - 1))
-
-    return Eloc
+    return local_e
